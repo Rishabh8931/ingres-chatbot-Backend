@@ -29,7 +29,8 @@ RULES:
 4. Values must NOT contain newlines.
 5. If query is vague, still guess best English.
 
-#Important:- style and type should be correct, so answer precisely, specially work on sanskrit and hinglish language carefully, you are not able to detect hinglish language so please analyse the hinglish language correctly
+#Important:- style and type should be correct, so answer precisely, specially work on sanskrit and hinglish language carefully, you are not able to detect hinglish language so please analyse the hinglish language correctly.
+# NOTE:- "behave like professional, don't use informal language "
 
 User query:"""
 

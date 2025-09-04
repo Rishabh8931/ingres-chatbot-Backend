@@ -10,6 +10,8 @@ from app.services.grok_service import(
     format_back_with_groq
 
 )
+from app.services.querryGenerator_service import QueryService 
+
 
 router = APIRouter(prefix="/nlp", tags=["NLP"])
 
@@ -47,5 +49,28 @@ async def format_answer(req: FormatBackRequest):
             lang_code=req.original_language_code
         )
         return {"final_text": final_text}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# ------------------- SQL Generator -------------------
+class SQLRequest(BaseModel):
+    user_query: str
+
+class SQLResponse(BaseModel):
+    user_query: str
+    generated_sql: str
+
+query_service = QueryService()
+
+@router.post("/to-sql", response_model=SQLResponse)
+async def query_to_sql(req: SQLRequest):
+    """
+    Convert user natural query -> SQL using hybrid approach.
+    """
+    try:
+        sql = query_service.generate_sql(req.user_query)
+        return {"user_query": req.user_query, "generated_sql": sql}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
