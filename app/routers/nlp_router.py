@@ -11,6 +11,7 @@ from app.services.grok_service import(
 
 )
 from app.services.querryGenerator_service import QueryService 
+from app.db.utils import run_sql_query
 
 
 router = APIRouter(prefix="/nlp", tags=["NLP"])
@@ -55,22 +56,26 @@ async def format_answer(req: FormatBackRequest):
 
 
 # ------------------- SQL Generator -------------------
-class SQLRequest(BaseModel):
-    user_query: str
-
-class SQLResponse(BaseModel):
+class SQLExecResponse(BaseModel):
     user_query: str
     generated_sql: str
+    db_result: dict
 
-query_service = QueryService()
-
-@router.post("/to-sql", response_model=SQLResponse)
+class SQLRequest(BaseModel):
+    user_query: str
+    
+@router.post("/to-sql", response_model=SQLExecResponse)
 async def query_to_sql(req: SQLRequest):
     """
-    Convert user natural query -> SQL using hybrid approach.
+    Convert user query -> SQL -> Run on DB -> Return result
     """
     try:
-        sql = query_service.generate_sql(req.user_query)
-        return {"user_query": req.user_query, "generated_sql": sql}
+        sql = QueryService.generate_sql(req.user_query)
+        result = run_sql_query(sql)  # 👈 DB pr run
+        return {
+            "user_query": req.user_query,
+            "generated_sql": sql,
+            "db_result": result
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
