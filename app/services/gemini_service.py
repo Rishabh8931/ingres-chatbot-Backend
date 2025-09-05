@@ -1,13 +1,12 @@
 # app/services/gemini_service.py
-import os
-import json
-import re
 from typing import Tuple
-from dotenv import load_dotenv
-import google.generativeai as genai
+from app.utils import (
+    config_util,
+    extract_json_util
+)
 
-load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+
 
 _MODEL = "gemini-1.5-flash"
 
@@ -52,7 +51,7 @@ Return RAW TEXT only, no JSON, no preface.
 # ----- HELPER -----
 
 def _generate(model: str, prompt: str, user_input: str) -> str:
-    model = genai.GenerativeModel(model)
+    model = config_util.get_gemini_model()
     resp = model.generate_content([prompt, user_input])
     if resp.prompt_feedback and resp.prompt_feedback.block_reason:
         raise RuntimeError(f"Gemini blocked: {resp.prompt_feedback.block_reason}")
@@ -60,22 +59,13 @@ def _generate(model: str, prompt: str, user_input: str) -> str:
         raise RuntimeError("No candidates from Gemini.")
     return resp.text.strip()
 
-def _extract_json(raw: str) -> dict:
-    """Ensure we extract valid JSON object even if model adds noise."""
-    try:
-        return json.loads(raw)
-    except:
-        match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if match:
-            return json.loads(match.group(0))
-        raise ValueError(f"Could not parse JSON from: {raw}")
 
 # ----- MAIN FUNCTIONS -----
 
 def normalize_query_with_gemini(user_query: str) -> Tuple[str, str, str]:
     raw = _generate(_MODEL, _NORMALIZE_PROMPT, user_query)
     try:
-        data = _extract_json(raw)
+        data = extract_json_util.extract_json(raw)
         ne = data["normalized_english"].strip()
         code = data.get("original_language_code", "unknown").strip()
         style = data.get("style", "english").strip().lower()
@@ -83,6 +73,29 @@ def normalize_query_with_gemini(user_query: str) -> Tuple[str, str, str]:
     except Exception as e:
         print(f"[DEBUG] Fallback because parsing failed: {e}\nRaw: {raw}")
         return user_query, "unknown", "english"
+    
+    # for pipeline
+
+async def normalize_query_with_gemini_pipeline(user_query: str) -> dict:
+    raw = _generate(_MODEL, _NORMALIZE_PROMPT, user_query)
+    try:
+        data = extract_json_util.extract_json(raw)
+        return {
+            "normalized_english": data["normalized_english"].strip(),
+            "original_language_code": data.get("original_language_code", "unknown").strip(),
+            "style": data.get("style", "english").strip().lower()
+        }
+    except Exception as e:
+        print(f"[DEBUG] Fallback because parsing failed: {e}\nRaw: {raw}")
+        return {
+            "normalized_english": user_query,
+            "original_language_code": "unknown",
+            "style": "english"
+        }
+
+    
+
+    
 
 def format_back_with_gemini(answer_english: str, style: str, lang_code: str) -> str:
     payload = f"""original_style: {style}

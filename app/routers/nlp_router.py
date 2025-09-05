@@ -11,7 +11,9 @@ from app.services.grok_service import(
 
 )
 from app.services.querryGenerator_service import QueryService 
+from app.services.gemini_explain import  explain_with_gemini
 from app.db.utils import run_sql_query
+from app.services.pipeline_service import run_pipeline
 
 
 router = APIRouter(prefix="/nlp", tags=["NLP"])
@@ -62,20 +64,60 @@ class SQLExecResponse(BaseModel):
     db_result: dict
 
 class SQLRequest(BaseModel):
-    user_query: str
-    
+    query: str
+
 @router.post("/to-sql", response_model=SQLExecResponse)
 async def query_to_sql(req: SQLRequest):
     """
     Convert user query -> SQL -> Run on DB -> Return result
     """
     try:
-        sql = QueryService.generate_sql(req.user_query)
+       
+        sql = QueryService().generate_sql(req.query)
         result = run_sql_query(sql)  # 👈 DB pr run
         return {
-            "user_query": req.user_query,
+            "user_query": req.query,
             "generated_sql": sql,
             "db_result": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+ 
+ ###   explaining agent
+
+ 
+class ExplainRequest(BaseModel):
+    data: dict
+    query: str
+    original_language_style: str
+    code: str
+
+@router.post("/explain")
+async def explain(req: ExplainRequest):
+    try:
+        explanation = explain_with_gemini(
+            data=req.data,
+            query=req.query,
+            original_language_style=req.original_language_style,
+            code=req.code
+        )
+        return {"status": "success", "explanation": explanation}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    
+
+
+class NormalizeRequest(BaseModel):
+    text: str
+
+class NormalizeResponse(BaseModel):
+    result : dict
+@router.post("/pipeline", response_model=NormalizeResponse)
+async def normalize(req: NormalizeRequest):
+    try:
+        result = await run_pipeline(req.text)
+        return {
+           "result" : result
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

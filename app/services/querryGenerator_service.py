@@ -1,106 +1,70 @@
-import os
-import re
-from dotenv import load_dotenv
-import google.generativeai as genai
 
-load_dotenv()
-
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-if not GOOGLE_API_KEY:
-    raise RuntimeError("Please set GOOGLE_API_KEY in .env")
-
-genai.configure(api_key=GOOGLE_API_KEY)
+from app.utils import (
+    config_util
+)
 
 
 class QueryService:
-    """
-    Hybrid Query Service:
-    - Simple queries → rule-based SQL templates
-    - Complex queries → Gemini-generated SQL
-    """
-
-    def __init__(self, model_name: str = "gemini-1.5-flash"):
-        self.model = genai.GenerativeModel(model_name)
-
-    def is_simple_query(self, query: str) -> bool:
-        comparison_keywords = ["compare", "versus", "vs", "between", "aur", "and"]
-        if any(word in query.lower() for word in comparison_keywords):
-            return False
-        return True
-
-    def handle_simple_query(self, query: str) -> str:
-        """
-        Rule-based SQL generator for simple queries.
-        """
-        years = re.findall(r"\b(19|20)\d{2}\b", query)
-        start_year, end_year = None, None
-        if len(years) >= 2:
-            start_year, end_year = years[0], years[1]
-        elif len(years) == 1:
-            start_year = end_year = years[0]
-
-        # detect state (first Capitalized word)
-        match = re.search(r"\b([A-Z][a-z]+)\b", query)
-        state = match.group(1) if match else None
-
-        # parameter mapping
-        if "level" in query.lower():
-            param = "Groundwater Level"
-        elif "recharge" in query.lower() or "water" in query.lower():
-            param = "Water Recharged"
-        elif "rainfall" in query.lower():
-            param = "Rainfall"
-        elif "exploit" in query.lower() or "extraction" in query.lower():
-            param = "Exploitation"
-        else:
-            param = "Groundwater Level"
-
-        sql = f"""
-        SELECT assessment_year, AVG(parameter_value) AS avg_value
-        FROM groundwater
-        WHERE parameter_name = '{param}'
-        """
-        if state:
-            sql += f" AND state ILIKE '{state}'"
-        if start_year and end_year:
-            sql += f" AND assessment_year BETWEEN {start_year} AND {end_year}"
-        sql += """
-        GROUP BY assessment_year
-        ORDER BY assessment_year;
-        """
-        return sql.strip()
-
-    def handle_complex_query(self, query: str) -> str:
-        """
-        Gemini handles multi-state/multi-city/multi-parameter queries.
-        """
-        prompt = f"""
-You are an expert SQL generator for PostgreSQL.
-
-TABLE: groundwater_db
-Columns:
-- state (TEXT)
-- city (TEXT)
-- assessment_year (INT)
-- parameter_name (TEXT)  -- values: 'Groundwater Level', 'Water Recharged', 'Rainfall', 'Exploitation'
-- parameter_value (FLOAT)
-- category (TEXT)
-
-RULES:
-1. If query mentions only STATE (no city), return average of all cities in that state per year.
-2. If multiple states/cities/parameters are compared, use GROUP BY or CTEs.
-3. Always return only one SQL query, nothing else.
-4. Use ILIKE for case-insensitive matching.
-5. Use GROUP BY assessment_year when averaging states.
-
-User query: {query}
-        """.strip()
-
-        response = self.model.generate_content(prompt)
-        return response.text.strip()
+    def __init__(self):
+        self.model = config_util.get_gemini_model( )
+        
 
     def generate_sql(self, query: str) -> str:
-        if self.is_simple_query(query):
-            return self.handle_simple_query(query)
-        else:
-            return self.handle_complex_query(query)
+        prompt = f"""
+You are an expert PostgreSQL query generator. 
+The database schema is:
+
+TABLE states (
+  state_id SERIAL PRIMARY KEY,
+  state_name VARCHAR(100)
+);
+
+TABLE cities (
+  city_id SERIAL PRIMARY KEY,
+  city_name VARCHAR(100),
+  state_id INT REFERENCES states(state_id)
+);
+
+TABLE parameters (
+  parameter_id SERIAL PRIMARY KEY,
+  parameter_name VARCHAR(100), -- values: 'Groundwater Level', 'Water Recharged', 'Rainfall', 'Exploitation'
+  unit VARCHAR(50)
+);
+
+TABLE yearly_data (
+  data_id SERIAL PRIMARY KEY,
+  city_id INT REFERENCES cities(city_id),
+  parameter_id INT REFERENCES parameters(parameter_id),
+  year INT,
+  value FLOAT
+);
+
+
+RULES:
+1. Always join all four tables correctly: yearly_data → cities → states → parameters.
+2. If the user asks for general "groundwater data" without specifying a parameter, 
+   then return all parameters ("Groundwater Level", "Water Recharged", "Rainfall", "Exploitation").
+3. If query mentions only a STATE (no specific city), calculate the **average of all its cities per year per parameter**.
+   - GROUP BY year, parameter_name, and unit.
+4. If query mentions a CITY, return that city’s yearly data (for the requested parameter(s)).
+5. If query mentions multiple STATES, compare them by applying Rule #3 for each state.
+   - The result should contain year, state, parameter_name, avg_value, and unit.
+6. If query mentions multiple CITIES across states, compare them by their yearly data.
+7. Always use ILIKE for case-insensitive matching of state_name, city_name, and parameter_name.
+8. If query specifies a year range, return yearly breakdown (GROUP BY yd.year, parameter_name, unit).
+9. If year range not given then give data for all year for requeste state or city.
+10. if only one year is given then give only for that year as required params.
+12. Always include `unit` from parameters table in SELECT.
+13. Return only valid SQL (no markdown, no explanation, no ```sql).
+
+
+
+User query: {query}
+"""
+        response = self.model.generate_content(prompt)
+        sql = response.text.strip()
+
+        # Clean out any markdown formatting
+        if sql.startswith("```"):
+            sql = sql.strip("```sql").strip("```")
+        return sql

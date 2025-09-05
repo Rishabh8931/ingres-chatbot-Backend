@@ -1,9 +1,10 @@
 # app/main.py
-from fastapi import FastAPI
+from fastapi import FastAPI,HTTPException
 from app.routers import groundwater
 from app.routers import nlp_router
 from app.db.session import test_db_connection
 from contextlib import asynccontextmanager
+
 
 
 
@@ -28,3 +29,5 @@ app.include_router(nlp_router.router)
 @app.get("/")
 def root():
     return {"message": "Groundwater AI Bot Backend is running 🚀"}
+
+
