@@ -11,7 +11,6 @@ from app.services.grok_service import(
 
 )
 from app.services.querryGenerator_service import QueryService 
-from app.services.gemini_explain import  explain_with_gemini
 from app.db.utils import run_sql_query
 from app.services.pipeline_service import run_pipeline
 
@@ -83,29 +82,9 @@ async def query_to_sql(req: SQLRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
  
- ###   explaining agent
 
- 
-class ExplainRequest(BaseModel):
-    data: dict
-    query: str
-    original_language_style: str
-    code: str
-
-@router.post("/explain")
-async def explain(req: ExplainRequest):
-    try:
-        explanation = explain_with_gemini(
-            data=req.data,
-            query=req.query,
-            original_language_style=req.original_language_style,
-            code=req.code
-        )
-        return {"status": "success", "explanation": explanation}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
     
-
+# pipeline creation
 
 class NormalizeRequest(BaseModel):
     text: str
@@ -121,3 +100,6 @@ async def normalize(req: NormalizeRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+    
