@@ -60,7 +60,7 @@ RULES:
 8. If query specifies a year range, return yearly breakdown (GROUP BY yd.year, parameter_name, unit).
 9. If year range not given then give data for all years for requested state or city.
 10. If only one year is given then give only for that year as required params.
-11. Always include `unit` from parameters table in SELECT.
+11. Always include `unit` from parameters and years table in SELECT.
 12. Return only valid SQL (no markdown, no explanation, no ```sql).
 
 User query: {query}

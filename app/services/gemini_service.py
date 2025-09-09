@@ -21,6 +21,7 @@ RULES:
 3. Never explain, never add extra keys.
 4. Values must NOT contain newlines.
 5. If query is vague, still guess best English.
+6. use numeric same as given by user.
 
 #Important:- style and type should be correct, so answer precisely, specially work on sanskrit and hinglish language carefully, you are not able to detect hinglish language so please analyse the hinglish language correctly.
 # NOTE:- "behave like professional, don't use informal language "
@@ -38,6 +39,8 @@ Return the final answer adapted to the user's style:
 - hindi → natural Hindi in Devanagari.
 - hinglish → mix of Romanized Hindi + simple English (chat style).
 - other-language-name → natural translation to that language.
+
+=> Important :- use numeric same as given by user.
 
 Return RAW TEXT only, no JSON, no preface.
 """ 

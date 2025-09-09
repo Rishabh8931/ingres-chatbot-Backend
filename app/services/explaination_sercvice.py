@@ -1,6 +1,5 @@
 # app/services/gemini_service.py
-from typing import Tuple
-from app.utils import config_util, extract_json_util
+from app.utils import config_util
 import logging
 import json
 
