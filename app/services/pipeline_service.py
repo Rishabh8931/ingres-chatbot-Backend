@@ -1,5 +1,7 @@
 # app/pipeline/run_pipeline.py
 import logging
+import json
+from fastapi.encoders import jsonable_encoder
 from app.services.gemini_service import (
     normalize_query_with_gemini_pipeline,
     format_back_with_gemini
@@ -18,7 +20,7 @@ async def run_pipeline(user_query: str):
     3. Execute SQL on DB
     4. Generate explanation
     5. Format back to user style
-    6. Return both raw results + final answer
+    6. Return both raw results + final answer (JSON-safe)
     """
 
     # Step 1: Normalize user query
@@ -38,18 +40,18 @@ async def run_pipeline(user_query: str):
         sql = QueryService().generate_sql(normalized_query)
         logging.info(f"[Pipeline SQL] Generated: {sql}")
         if not sql:
-            return {
+            return jsonable_encoder({
                 "message": "Sorry, data not found",
                 "results": None,
                 "final_answer": None,
-            }
+            })
     except Exception as e:
         logging.error(f"[Pipeline ERROR] SQL generation failed: {e}")
-        return {
+        return jsonable_encoder({
             "message": "Sorry, data not found",
             "results": None,
             "final_answer": None,
-        }
+        })
 
     # Step 3: Execute SQL
     try:
@@ -57,18 +59,18 @@ async def run_pipeline(user_query: str):
         result = sanitize_result(result)
         if not result or (isinstance(result, dict) and not result.get("rows")):
             logging.info("[Pipeline INFO] Query returned no rows.")
-            return {
+            return jsonable_encoder({
                 "message": "Sorry, data not found",
                 "results": [],
                 "final_answer": None,
-            }
+            })
     except Exception as e:
         logging.error(f"[Pipeline ERROR] Database query failed: {e}")
-        return {
+        return jsonable_encoder({
             "message": "Sorry, database query failed",
             "results": None,
             "final_answer": None,
-        }
+        })
 
     # Step 4: Explanation
     try:
@@ -88,8 +90,10 @@ async def run_pipeline(user_query: str):
         logging.error(f"[Pipeline ERROR] Formatting failed: {e}")
         final_answer = "Sorry, explanation could not be generated"
 
-    # ✅ Final response with both
-    return {
-        "results": result,          # raw DB query output
-        "final_answer": final_answer,  # AI generated explanation/answer
+    # ✅ Final response as JSON-safe dict
+    response = {
+        "results": result,           # raw DB query output
+        "final_answer": final_answer # AI generated explanation/answer
     }
+
+    return jsonable_encoder(response)   # ensures it's JSON serializable
