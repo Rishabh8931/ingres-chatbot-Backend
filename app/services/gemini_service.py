@@ -3,7 +3,7 @@ from typing import Tuple
 from app.utils import config_util, extract_json_util
 import logging
 
-_MODEL = "gemini-1.5-flash"
+_MODEL = "gemini-2.5-flash"
 
 # ----- SYSTEM PROMPTS -----
 _NORMALIZE_PROMPT = """You are a multilingual query normalizer. And also a helper of an chat-bot that analyses the groundwater level,rainfall,groundwater exploitation, gw-recharge,etc.
