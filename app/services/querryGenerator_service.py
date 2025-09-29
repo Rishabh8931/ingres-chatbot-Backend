@@ -1,7 +1,7 @@
 from app.utils import config_util
 import logging
 
-_MODEL_ = "gemini-2.5-flash"
+_MODEL_ = "gemini-flash-latest"
 
 class QueryService:
     def __init__(self):

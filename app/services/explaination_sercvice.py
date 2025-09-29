@@ -3,7 +3,7 @@ from app.utils import config_util
 import logging
 import json
 
-_MODEL = "gemini-2.5-flash"
+_MODEL = "gemini-flash-latest"
 
 
 
